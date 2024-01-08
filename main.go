@@ -8,41 +8,46 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
-
-	w32 "github.com/jcollie/w32"
 )
 
 type Monitor struct {
-	Name string
-	Win int
-	Mac int
+	Name   string
+	Win    int
+	Mac    int
 	Height int
 }
-type Rectangle struct{
-	Top, Left, Right, Bottom  int32
+type Rectangle struct {
+	Top, Left, Right, Bottom int32
 }
+
 var (
-	user32, _                              = syscall.LoadLibrary("User32.dll")
-	dxva2, _                               = syscall.LoadLibrary("dxva2.dll")
-	procSetVCPFeature, _                   = syscall.GetProcAddress(dxva2, "SetVCPFeature")
-	procGetVCPFeatureAndVCPFeatureReply, _ = syscall.GetProcAddress(dxva2, "GetVCPFeatureAndVCPFeatureReply")
-	procEnumDisplayMonitors, _             = syscall.GetProcAddress(user32, "EnumDisplayMonitors")
-	monitors                               = map[string]Monitor{
+	user32, _                                      = syscall.LoadLibrary("User32.dll")
+	dxva2, _                                       = syscall.LoadLibrary("dxva2.dll")
+	procSetVCPFeature, _                           = syscall.GetProcAddress(dxva2, "SetVCPFeature")
+	procGetVCPFeatureAndVCPFeatureReply, _         = syscall.GetProcAddress(dxva2, "GetVCPFeatureAndVCPFeatureReply")
+	procEnumDisplayMonitors, _                     = syscall.GetProcAddress(user32, "EnumDisplayMonitors")
+	procGetPhysicalMonitorsFromHMONITOR, _         = syscall.GetProcAddress(dxva2, "GetPhysicalMonitorsFromHMONITOR")
+	procGetNumberOfPhysicalMonitorsFromHMONITOR, _ = syscall.GetProcAddress(dxva2, "GetNumberOfPhysicalMonitorsFromHMONITOR")
+	monitors                                       = map[string]Monitor{
 		"asus": {
-			Name: "asus",
-			Win: 15,
-			Mac: 17,
+			Name:   "asus",
+			Win:    15,
+			Mac:    17,
 			Height: 1080,
 		},
 		"aoc": {
-			Name: "aoc",
-			Win: 15,
-			Mac: 16,
+			Name:   "aoc",
+			Win:    15,
+			Mac:    16,
 			Height: 1440,
 		},
 	}
 )
 
+type PhysicalMonitor struct{
+	Monitor syscall.Handle
+	Description [128]uint16
+}
 type mont struct {
 	hnd    syscall.Handle
 	height int
@@ -89,6 +94,7 @@ func ToggleMonitor(monitor Monitor, output *bytes.Buffer) error {
 				height: int(rect.Bottom),
 			}
 		}
+		output.WriteString(fmt.Sprintln(hmon))
 		return 1
 	})
 
@@ -97,12 +103,17 @@ func ToggleMonitor(monitor Monitor, output *bytes.Buffer) error {
 		return fmt.Errorf("%s", callErr.Error())
 	}
 
-	_, monitorCount := w32.GetNumberOfPhysicalMonitorsFromHMONITOR(w32.HMONITOR(hmon.hnd))
+	monitorCount := 0
+	_, _, callErr = syscall.SyscallN(procGetNumberOfPhysicalMonitorsFromHMONITOR, uintptr(hmon.hnd), uintptr(unsafe.Pointer(&monitorCount)))
+	if callErr != 0 {
+		return fmt.Errorf("%s", callErr.Error())
+	}
+	output.WriteString(fmt.Sprintf("monitor count: %v\n",monitorCount))
 
-	physicalMonitorsBuffer := make([]w32.PHYSICAL_MONITOR, monitorCount)
+	physicalMonitorsBuffer := make([]PhysicalMonitor, monitorCount)
+	syscall.SyscallN(procGetPhysicalMonitorsFromHMONITOR, uintptr(hmon.hnd), uintptr(len(physicalMonitorsBuffer)), uintptr(unsafe.Pointer(&physicalMonitorsBuffer[0])))
 
-	w32.GetPhysicalMonitorsFromHMONITOR(w32.HMONITOR(hmon.hnd), physicalMonitorsBuffer)
-
+	output.WriteString(fmt.Sprint(physicalMonitorsBuffer))
 	currentVCPVal, err := GetVCPFeature(syscall.Handle(physicalMonitorsBuffer[0].Monitor), 0x60)
 	if err != nil {
 		return fmt.Errorf("Getvcp fail: %w", err)
@@ -112,9 +123,8 @@ func ToggleMonitor(monitor Monitor, output *bytes.Buffer) error {
 	if currentVCPVal != uintptr(monitor.Win) {
 		newVCPVal = monitor.Win
 	} else {
-		newVCPVal = monitor.Mac	
+		newVCPVal = monitor.Mac
 	}
-	
 
 	if err := SetVCPFeature(syscall.Handle(physicalMonitorsBuffer[0].Monitor), 0x60, newVCPVal); err != nil {
 		return fmt.Errorf("set vcp failed: %w", err)
