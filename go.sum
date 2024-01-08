@@ -1,4 +1,2 @@
-github.com/go-bindata/go-bindata v3.1.2+incompatible h1:5vjJMVhowQdPzjE1LdxyFF7YFTXg5IgGVW4gBr5IbvE=
-github.com/go-bindata/go-bindata v3.1.2+incompatible/go.mod h1:xK8Dsgwmeed+BBsSy2XTopBn/8uK2HWuGSnA11C3Joo=
 github.com/jcollie/w32 v1.0.0 h1:dJ0Otkrm+cZXAGvWhTLK60NdqWTvYUuxx0HX8i6O+JY=
 github.com/jcollie/w32 v1.0.0/go.mod h1:pFYs2X1qM8tpBEhLTdlUqNowBsZdd2JkDzyNicE25GU=
