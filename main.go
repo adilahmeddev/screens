@@ -44,8 +44,8 @@ var (
 	}
 )
 
-type PhysicalMonitor struct{
-	Monitor syscall.Handle
+type PhysicalMonitor struct {
+	Monitor     syscall.Handle
 	Description [128]uint16
 }
 type mont struct {
@@ -108,7 +108,7 @@ func ToggleMonitor(monitor Monitor, output *bytes.Buffer) error {
 	if callErr != 0 {
 		return fmt.Errorf("%s", callErr.Error())
 	}
-	output.WriteString(fmt.Sprintf("monitor count: %v\n",monitorCount))
+	output.WriteString(fmt.Sprintf("monitor count: %v\n", monitorCount))
 
 	physicalMonitorsBuffer := make([]PhysicalMonitor, monitorCount)
 	syscall.SyscallN(procGetPhysicalMonitorsFromHMONITOR, uintptr(hmon.hnd), uintptr(len(physicalMonitorsBuffer)), uintptr(unsafe.Pointer(&physicalMonitorsBuffer[0])))
@@ -162,6 +162,15 @@ func GetVCPFeature(hPhysicalMonitor syscall.Handle, bVCPCode byte) (p uintptr, e
 }
 
 func WriteLogToFile(b *bytes.Buffer) {
+	log := false
+	for _, arg := range os.Args {
+		if arg == "log" {
+			log = true
+		}
+	}
+	if !log {
+		return
+	}
 	os.WriteFile(
 		fmt.Sprintf(
 			"log%v.txt",
